@@ -1,0 +1,38 @@
+﻿@page "/"
+
+<h1>Blazored AutoSaveEditForm Sample</h1>
+
+<BlazoredAutoSaveEditForm Id="form-one" Model="myFormModel" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+
+    <div class="form-group">
+        <label for="exampleInputEmail1">First name</label>
+        <InputText @bind-Value="myFormModel.FirstName" class="form-control" />
+    </div>
+
+    <div class="form-group">
+        <label for="exampleInputEmail1">Last name</label>
+        <InputText @bind-Value="myFormModel.LastName" class="form-control" />
+    </div>
+
+    <button class="btn btn-primary" type="submit">Submit</button>
+</BlazoredAutoSaveEditForm>
+
+
+@code {
+    private MyFormModel myFormModel = new MyFormModel();
+
+    public class MyFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string FirstName { get; set; }
+        [System.ComponentModel.DataAnnotations.Required]
+        public string LastName { get; set; }
+    }
+
+    private void HandleValidSubmit()
+    {
+        Console.WriteLine($"Form Submitted For: {myFormModel.FirstName} {myFormModel.LastName}");
+        myFormModel = new MyFormModel();
+    }
+}
