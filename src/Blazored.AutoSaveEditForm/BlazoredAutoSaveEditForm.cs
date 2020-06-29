@@ -9,6 +9,7 @@ using Microsoft.JSInterop;
 
 namespace Blazored.AutoSaveEditForm
 {
+
     public class BlazoredAutoSaveEditForm : ComponentBase
     {
         private readonly Func<Task> _handleSubmitDelegate; // Cache to avoid per-render allocations
@@ -48,6 +49,11 @@ namespace Blazored.AutoSaveEditForm
         /// a value for <see cref="EditContext"/>.
         /// </summary>
         [Parameter] public object Model { get; set; }
+
+        /// <summary>
+        /// Specifies the storage to use for storing the form data. Defaults to Local Storage.
+        /// </summary>
+        [Parameter] public StorageType StorageType { get; set; } = StorageType.LocalStorage;
 
         /// <summary>
         /// Specifies the content to be rendered inside this <see cref="EditForm"/>.
@@ -98,7 +104,7 @@ namespace Blazored.AutoSaveEditForm
             if (_fixedEditContext == null || EditContext != null || Model != _fixedEditContext.Model)
             {
                 _fixedEditContext = EditContext ?? new EditContext(Model);
-                _fixedEditContext.OnFieldChanged += SaveToLocalStorage;
+                _fixedEditContext.OnFieldChanged += SaveToStorage;
             }
         }
 
@@ -106,7 +112,7 @@ namespace Blazored.AutoSaveEditForm
         {
             if (firstRender)
             {
-                var savedModel = await LoadFromLocalStorage();
+                var savedModel = await LoadFromStorage();
 
                 if (Model is object && savedModel is object)
                 {
@@ -121,16 +127,16 @@ namespace Blazored.AutoSaveEditForm
             }
         }
 
-        private async void SaveToLocalStorage(object sender, FieldChangedEventArgs args)
+        private async void SaveToStorage(object sender, FieldChangedEventArgs args)
         {
             var model = Model ?? _fixedEditContext.Model;
             var serializedData = JsonSerializer.Serialize(model);
-            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", Id, serializedData);
+            await _jsRuntime.InvokeVoidAsync($"{GetSelectedStorageType()}.setItem", Id, serializedData);
         }
 
-        private async Task<object> LoadFromLocalStorage()
+        private async Task<object> LoadFromStorage()
         {
-            var serialisedData = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", Id);
+            var serialisedData = await _jsRuntime.InvokeAsync<string>($"{GetSelectedStorageType()}.getItem", Id);
             if (serialisedData == null) return null;
             var modelType = EditContext?.Model.GetType() ?? Model.GetType();
 
@@ -194,7 +200,7 @@ namespace Blazored.AutoSaveEditForm
                 var submitSuccess = await OnSubmit.Invoke(_fixedEditContext);
                 if (submitSuccess)
                 {
-                    await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", Id);
+                    await RemoveItemFromStorage();
                 }
             }
             else
@@ -207,7 +213,7 @@ namespace Blazored.AutoSaveEditForm
                     await OnValidSubmit.InvokeAsync(_fixedEditContext);
 
                     // Clear saved form model from local storage
-                    await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", Id);
+                    await RemoveItemFromStorage();
                 }
 
                 if (!isValid && OnInvalidSubmit.HasDelegate)
@@ -215,6 +221,13 @@ namespace Blazored.AutoSaveEditForm
                     await OnInvalidSubmit.InvokeAsync(_fixedEditContext);
                 }
             }
+
+            async Task RemoveItemFromStorage()
+            {
+                await _jsRuntime.InvokeVoidAsync($"{GetSelectedStorageType()}.removeItem", Id);
+            }
         }
+
+        private string GetSelectedStorageType() => StorageType == StorageType.LocalStorage ? "localStorage" : "sessionStorage";
     }
 }
